@@ -2,7 +2,7 @@
 
 # Large Scale Data Processing: Project 2
 
-## Project Tasks and Results
+
 
 ### 1. Exact F2 Algorithm
 - **Task:** Implement the `exact_F2` function to calculate the exact F2 value.
