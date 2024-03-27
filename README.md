@@ -1,35 +1,41 @@
+
+
 # Large Scale Data Processing: Project 2
-## Getting started
-Head to [Project 1](https://github.com/CSCI3390Spring2024/project_1) if you're looking for information on Git, template repositories, or setting up your local/remote environments.
 
-## Resilient distributed datasets in Spark
-This project will familiarize you with RDD manipulations by implementing some of the sketching algorithms the course has covered thus far.  
+## Project Tasks and Results
 
-You have been provided with the program's skeleton, which consists of 5 functions for computing either F0 or F2: the BJKST, tidemark, tug-of-war, exact F0, and exact F2 algorithms. The tidemark and exact F0 functions are given for your reference.
+### 1. Exact F2 Algorithm
+- **Task:** Implement the `exact_F2` function to calculate the exact F2 value.
+- **Results:**
+  - Local Execution: ![Local Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/4d1374b2-d5aa-4712-bb08-6ce2993df657)
+  - GCP Execution: ![GCP Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/80e7669a-3a24-4c97-ba33-d553b16d8930)
+  - Note: Execution on GCP was surprisingly slower.
 
-## Relevant data
+### 2. Tug-of-War Algorithm
+- **Task:** Implement the `Tug_of_War` function with specified parameters.
+- **Results:**
+  - Local Execution: ![Local Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/a7f398ca-a7b6-4ee7-b5e0-607dd63c0801)
+  - GCP Execution: ![GCP Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/d6644010-5425-4363-b294-c692531619d8)
 
-You can find the TAR file containing `2014to2017.csv` [here](https://drive.google.com/file/d/1MtCimcVKN6JrK2sLy4GbjeS7E2a-UMA0/view?usp=sharing). Download and expand the TAR file for local processing. For processing in the cloud, refer to the steps for creating a storage bucket in [Project 1](https://github.com/CSCI3390Spring2024/project_1) and upload `2014to2017.csv`.
+### 3. BJKST Algorithm
+- **Task:** Implement the `BJKST` function to estimate F0 with the smallest `width` achieving an error of +/- 20%.
+- **Results:**
+  - Local Execution: ![Local Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/e76d68e1-d7ca-414e-8930-c195bbda99cf)
+  - GCP Execution: ![GCP Execution Result](https://github.com/kelseyzeng0610/project_2/assets/78379458/679bc6af-ecdc-41df-b13f-4ceb8e3bbd72)
 
-`2014to2017.csv` contains the records of parking tickets issued in New York City from 2014 to 2017. You'll see that the data has been cleaned so that only the license plate information remains. Keep in mind that a single car can receive multiple tickets within that period and therefore appear in multiple records.  
+### 4. Algorithm Comparison
+- **BJKST vs. Exact F0:**
+  - BJKST Estimate: 8,388,608
+  - Exact F0: 7,406,649
+  - The BJKST algorithm with 80 buckets and 5 trials provided a slightly higher estimate than the exact F0 value. The error of 13.3% is within an acceptable range.
+- **Tug-of-War vs. Exact F2:**
+  - Tug-of-War Estimate: 7,300,978,582
+  - Exact F2: 8,567,966,130
+  - The Tug-of-War algorithm's estimate is lower than the exact F2 value. The parameters may require further tuning.
 
-**Hint**: while implementing the functions, it may be helpful to copy 100 records or so to a new file and use that file for faster testing.  
+### Summary
+The BJKST algorithm can provide a relatively accurate estimate for the distinct count problem with carefully chosen parameters. It offers a trade-off between accuracy and computational efficiency compared to the exact computation.
+The Tug-of-War algorithm, on the other hand, may require more careful parameter tuning to achieve a closer approximation for the F2 problem. The algorithm itself also took a long time to run on GCP/Local Machine, possibly due to the computational complexity of maintaining multiple sketches.
 
-## Calculating and reporting your findings
-You'll be submitting a report along with your code that provides commentary on the tasks below.  
-
-1. **(3 points)** Implement the `exact_F2` function. The function accepts an RDD of strings as an input. The output should be exactly `F2 = sum(Fs^2)`, where `Fs` is the number of occurrences of plate `s` and the sum is taken over all plates. This can be achieved in one line using the `map` and `reduceByKey` methods of the RDD class. Run `exact_F2` locally **and** on GCP with 1 driver and 4 machines having 2 x N1 cores. Copy the results to your report. Terminate the program if it runs for longer than 30 minutes.
-2. **(3 points)** Implement the `Tug_of_War` function. The function accepts an RDD of strings, a parameter `width`, and a parameter `depth` as inputs. It should run `width * depth` Tug-of-War sketches, group the outcomes into groups of size `width`, compute the means of each group, and then return the median of the `depth` means in approximating F2. A 4-universal hash function class `four_universal_Radamacher_hash_function`, which generates a hash function from a 4-universal family, has been provided for you. The generated function `hash(s: String)` will hash a string to 1 or -1, each with a probability of 50%. Once you've implemented the function, set `width` to 10 and `depth` to 3. Run `Tug_of_War` locally **and** on GCP with 1 driver and 4 machines having 2 x N1 cores. Copy the results to your report. Terminate the program if it runs for longer than 30 minutes. **Please note** that the algorithm won't be significantly faster than `exact_F2` since the number of different cars is not large enough for the memory to become a bottleneck. Additionally, computing `width * depth` hash values of the license plate strings requires considerable overhead. That being said, executing with `width = 1` and `depth = 1` should generally still be faster.
-3. **(3 points)** Implement the `BJKST` function. The function accepts an RDD of strings, a parameter `width`, and a parameter `trials` as inputs. `width` denotes the maximum bucket size of each sketch. The function should run `trials` sketches and return the median of the estimates of the sketches. A template of the `BJKSTSketch` class is also included in the sample code. You are welcome to finish its methods and apply that class or write your own class from scratch. A 2-universal hash function class `hash_function(numBuckets_in: Long)` has also been provided and will hash a string to an integer in the range `[0, numBuckets_in - 1]`. Once you've implemented the function, determine the smallest `width` required in order to achieve an error of +/- 20% on your estimate. Keeping `width` at that value, set `depth` to 5. Run `BJKST` locally **and** on GCP with 1 driver and 4 machines having 2 x N1 cores. Copy the results to your report. Terminate the program if it runs for longer than 30 minutes.
-4. **(1 point)** Compare the BJKST algorithm to the exact F0 algorithm and the tug-of-war algorithm to the exact F2 algorithm. Summarize your findings.
-
-## Submission via GitHub
-Delete your project's current **README.md** file (the one you're reading right now) and include your report as a new **README.md** file in the project root directory. Have no fear—the README with the project description is always available for reading in the template repository you created your repository from. For more information on READMEs, feel free to visit [this page](https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-readmes) in the GitHub Docs. You'll be writing in [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown). Be sure that your repository is up to date and you have pushed all changes you've made to the project's code. When you're ready to submit, simply provide the link to your repository in the Canvas assignment's submission.
-
-## You must do the following to receive full credit:
-1. Create your report in the ``README.md`` and push it to your repo.
-2. In the report, you must include your (and your partner's) full name in addition to any collaborators.
-3. Submit a link to your repo in the Canvas assignment.
-
-## Late submission penalties
-Please refer to the course policy.
+## Contributors
+Kelsey Zeng, Zihan Ni, Peiyu Zhong
