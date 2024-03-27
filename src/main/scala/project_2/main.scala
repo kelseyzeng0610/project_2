@@ -1,3 +1,4 @@
+
 package project_2
 
 import org.apache.spark.sql.SparkSession
@@ -62,30 +63,30 @@ object main{
       return if( ( ((a * t3 + b* t2 + c*t + b) % p) & 1) == 0 ) 1 else -1;
     }
   }
-
-  class BJKSTSketch(bucket_in: Set[(String, Int)] ,  z_in: Int, bucket_size_in: Int) extends Serializable {
-/* A constructor that requies intialize the bucket and the z value. The bucket size is the bucket size of the sketch. */
-
+class BJKSTSketch(bucket_in: Set[(String, Int)], z_in: Int, bucket_size_in: Int) extends Serializable {
     var bucket: Set[(String, Int)] = bucket_in
     var z: Int = z_in
+    val BJKST_bucket_size: Int = bucket_size_in
 
-    val BJKST_bucket_size = bucket_size_in;
-
-    def this(s: String, z_of_s: Int, bucket_size_in: Int){
-      /* A constructor that allows you pass in a single string, zeroes of the string, and the bucket size to initialize the sketch */
-      this(Set((s, z_of_s )) , z_of_s, bucket_size_in)
+    def +(that: BJKSTSketch): BJKSTSketch = {
+        val mergedBucket = (this.bucket ++ that.bucket).toSeq.sortBy(_._2).takeRight(BJKST_bucket_size).toSet
+        val mergedZ = math.max(this.z, that.z)
+        new BJKSTSketch(mergedBucket, mergedZ, BJKST_bucket_size)
     }
 
-    def +(that: BJKSTSketch): BJKSTSketch = {    /* Merging two sketches */
-
+    def add_string(s: String, z_of_s: Int): BJKSTSketch = {
+        if (z_of_s > this.z) {
+            this.bucket = Set((s, z_of_s))
+            this.z = z_of_s
+        } else if (z_of_s == this.z) {
+            this.bucket += ((s, z_of_s))
+            if (this.bucket.size > BJKST_bucket_size) {
+                this.bucket = this.bucket.toSeq.sortBy(_._2).takeRight(BJKST_bucket_size).toSet
+            }
+        }
+        this
     }
-
-    def add_string(s: String, z_of_s: Int): BJKSTSketch = {   /* add a string to the sketch */
-
-    }
-  }
-
-
+}
   def tidemark(x: RDD[String], trials: Int): Double = {
     val h = Seq.fill(trials)(new hash_function(2000000000))
 
@@ -98,15 +99,62 @@ object main{
     return ans
   }
 
+def BJKST(x: RDD[String], width: Int, trials: Int): Double = {
+  val hashFunctions = Seq.fill(trials)(new hash_function(2000000000))
 
-  def BJKST(x: RDD[String], width: Int, trials: Int) : Double = {
+  val initialSketches = Seq.fill(trials)(new BJKSTSketch(Set.empty[(String, Int)], 0, width))
 
+  val updatedSketches = x.aggregate(initialSketches)(
+    seqOp = (sketches, str) => {
+      sketches.zipWithIndex.map { case (sketch, index) =>
+        val hashValue = hashFunctions(index).hash(str)
+        val zeroesCount = hashFunctions(index).zeroes(hashValue)
+        sketch.add_string(str, zeroesCount)
+      }
+    },
+    combOp = (sketchesA, sketchesB) => {
+      sketchesA.zip(sketchesB).map { case (sketchA, sketchB) =>
+        sketchA + sketchB
+      }
+    }
+  )
+
+  val estimates = updatedSketches.map(sketch => {
+    math.pow(2, sketch.z.toDouble) // Simplified estimation logic
+  })
+
+  val sortedEstimates = estimates.sorted
+  val median = if (sortedEstimates.length % 2 == 0) {
+    (sortedEstimates(sortedEstimates.length / 2 - 1) + sortedEstimates(sortedEstimates.length / 2)) / 2.0
+  } else {
+    sortedEstimates(sortedEstimates.length / 2)
   }
 
+  median
+}
 
-  def Tug_of_War(x: RDD[String], width: Int, depth:Int) : Long = {
 
-  }
+
+
+ def Tug_of_War(x: RDD[String], width: Int, depth:Int) : Long = {
+    val sketches = Array.tabulate(width * depth)(i => new four_universal_Radamacher_hash_function)
+
+    val tugOfWarEstimates = sketches.zipWithIndex.map { case (hashFunc, idx) =>
+        val sketch = x.map(s => hashFunc.hash(s)).reduce(_ + _)
+        (idx / width, sketch * sketch)
+    }
+
+    val groupedEstimates = tugOfWarEstimates.groupBy(_._1).mapValues(_.map(_._2).sum / width).values.toArray.sorted
+    val median = if (groupedEstimates.length % 2 == 0) {
+        val mid = groupedEstimates.length / 2
+        (groupedEstimates(mid - 1) + groupedEstimates(mid)) / 2
+    } else {
+        groupedEstimates(groupedEstimates.length / 2)
+    }
+
+    median
+}
+
 
 
   def exact_F0(x: RDD[String]) : Long = {
@@ -114,10 +162,12 @@ object main{
     return ans
   }
 
-
-  def exact_F2(x: RDD[String]) : Long = {
-
+  def exact_F2(x: RDD[String]): Long = {
+    val counts = x.map(s => (s, 1L)).reduceByKey(_ + _)
+    val f2 = counts.map { case (_, count) => count * count }.reduce(_ + _)
+    f2
   }
+
 
 
 
